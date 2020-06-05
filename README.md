@@ -1,1 +1,143 @@
-# volcano-sample
+# サンプルアプリケーション
+
+## 1. クラスタのセットアップ
+
+### 1.1. gcloud のインストール
+
+https://cloud.google.com/sdk/docs/quickstart-windows?hl=ja
+をご参照いただき、gcloud のインストールをお願いします。以後、PowerShell での実行を想定します。
+
+```bash
+$project_id = ""
+$compute_region = "asia-northeast1"
+$compute_zone = "asia-northeast1-c"
+gcloud config set project ${project_id}
+gcloud config set compute/region ${compute_region}
+gcloud config set compute/zone ${compute_zone}
+```
+
+### 1.2. GKE クラスタの作成
+
+基本的な設定値を指定し、
+
+```bash
+$cluster_name = "batch"
+$cluster_ver = "1.16.8-gke.15"
+$machine_type = "n1-standard-2"
+```
+
+デフォルトのノードプールを GCP の Container-Optimized OS (Linux) として GKE クラスタを作成します。
+
+```bash
+gcloud container clusters create ${cluster_name} --zone ${compute_zone} --cluster-version ${cluster_ver} --machine-type ${machine_type} --enable-ip-alias --preemptible --enable-autoscaling --num-nodes 1 --min-nodes 1 --max-nodes 3 --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --node-labels "os=cos" --enable-stackdriver-kubernetes --no-enable-autoupgrade --maintenance-window-start "2000-01-01T09:00:00-04:00" --maintenance-window-end "2000-01-01T17:00:00-04:00" --maintenance-window-recurrence 'FREQ=WEEKLY;BYDAY=SA,SU' --scopes "service-control,service-management,compute-rw,storage-ro,cloud-platform,logging-write,monitoring-write" --no-enable-basic-auth --no-issue-client-certificate
+```
+
+そこに Windows ノードプールを追加します。
+（また、Windows の場合、GPU やプリエンプティブル VM、Workload Identity が利用できないことにご注意ください）
+Windows のバージョンマッピング（コンテナとして実行できるベースイメージと関係してきます）については以下をご参照ください。
+https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-cluster-windows?hl=ja#version_mapping
+
+```bash
+gcloud container node-pools create "${cluster_name}-win-ltsc" --cluster ${cluster_name} --machine-type ${machine_type} --image-type "WINDOWS_LTSC" --enable-autoscaling --num-nodes 1 --min-nodes 1 --max-nodes 100 --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --no-enable-autoupgrade --node-labels "os=win-ltsc" --metadata "disable-legacy-endpoints=true"
+```
+
+kubectl での操作ができるようクラウドから kubeconfig を取得し、ノードの状態を確認します。
+
+```bash
+gcloud container clusters get-credentials ${cluster_name}
+kubectl get nodes -o wide
+```
+
+### 1.4. Volcano のインストール
+
+以下のコマンドで Volcano をインストールしてください。
+
+```bash
+$volcano_version = "v0.4.0"
+kubectl apply -f "https://raw.githubusercontent.com/volcano-sh/volcano/${volcano_version}/installer/volcano-development.yaml"
+kubectl -n volcano-system get all
+```
+
+### 1.5. その他スケジュール上有用なリソースを配置
+
+```bash
+kubectl apply -f sample/00-common/priority.yaml
+```
+
+## 2. クラスタのセットアップ
+
+### 2.1. アプリケーションの build
+
+```bash
+cd sample/00-common
+docker run --rm -it -v "<カレントディレクトリ>":C:\tmp -w C:\tmp golang:1.14.4-nanoserver-1809 cmd.exe
+$ go build
+$ exit
+docker build -t "gcr.io/${project_id}/sample-apps:envs" .
+```
+
+### 2.2. アプリケーションの ship と deploy
+
+sample/00-common/samples.yaml の @your-project-id を ${project_id} に置き換え、以下を実行します。
+
+```bash
+gcloud auth configure-docker
+docker push "gcr.io/${project_id}/sample-apps:envs"
+kubectl apply -f sample/00-common/samples.yaml
+```
+
+### 2.3. 結果の確認とお掃除
+
+```bash
+open "https://console.cloud.google.com/kubernetes/workload"
+kubectl describe job.batch.volcano.sh sample
+kubectl delete job.batch.volcano.sh sample
+```
+
+## 3. 100 並列の分散処理実行
+
+### 3.1. Cloud Storage (GCS) へのファイルアップロード
+
+```bash
+$samle_bucket_name = "sample-20200505"
+$samle_user_id = "user-0001"
+gsutil mb -c STANDARD -l ${compute_region} gs://${samle_bucket_name}/
+gsutil cp sample/01-task/input.csv gs://${samle_bucket_name}/${samle_user_id}/
+gsutil cp sample/01-task/parameters.csv gs://${samle_bucket_name}/${samle_user_id}/
+```
+
+### 3.2. GKE から GCS へアクセスするための設定
+
+GCP へのアクセス権限をもつサービスアカウントと、そのアクセスキーを作ります。
+
+```bash
+gcloud iam service-accounts create gcs-access
+gcloud projects add-iam-policy-binding ${project_id} --member "serviceAccount:gcs-access@${project_id}.iam.gserviceaccount.com" --role roles/storage.admin
+gcloud iam service-accounts keys create key.json --iam-account "gcs-access@${project_id}.iam.gserviceaccount.com"
+```
+
+それを GKE 上の Secret に格納します。
+
+```bash
+kubectl create secret generic gcs-access --from-file=key.json=key.json
+kubectl describe secrets gcs-access
+```
+
+### 3.3. アプリケーションの build, ship & deploy
+
+sample/01-task/task.yaml を以下の値に置き換え、後続のコマンドを実行します。
+
+- @your-project-id > ${project_id}
+- @your-bucket > ${samle_bucket_name}
+- @your-user > ${samle_user_id}
+
+```bash
+cd sample/01-task
+docker run --rm -it -v "<カレントディレクトリ>":C:\tmp -w C:\tmp golang:1.14.4-nanoserver-1809 cmd.exe
+$ go build
+$ exit
+docker build -t "gcr.io/${project_id}/sample-apps:01" .
+docker push "gcr.io/${project_id}/sample-apps:01"
+kubectl apply -f sample/01-task/task.yaml
+kubectl describe job.batch.volcano.sh task01
+```
