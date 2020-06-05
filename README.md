@@ -4,7 +4,7 @@
 
 ### 1.1. gcloud のインストール
 
-https://cloud.google.com/sdk/docs/quickstart-windows?hl=ja
+https://cloud.google.com/sdk/docs/quickstart-windows?hl=ja  
 をご参照いただき、gcloud のインストールをお願いします。以後、PowerShell での実行を想定します。
 
 ```bash
@@ -32,9 +32,9 @@ $machine_type = "n1-standard-2"
 gcloud container clusters create ${cluster_name} --zone ${compute_zone} --cluster-version ${cluster_ver} --machine-type ${machine_type} --enable-ip-alias --preemptible --enable-autoscaling --num-nodes 1 --min-nodes 1 --max-nodes 3 --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --node-labels "os=cos" --enable-stackdriver-kubernetes --no-enable-autoupgrade --maintenance-window-start "2000-01-01T09:00:00-04:00" --maintenance-window-end "2000-01-01T17:00:00-04:00" --maintenance-window-recurrence 'FREQ=WEEKLY;BYDAY=SA,SU' --scopes "service-control,service-management,compute-rw,storage-ro,cloud-platform,logging-write,monitoring-write" --no-enable-basic-auth --no-issue-client-certificate
 ```
 
-そこに Windows ノードプールを追加します。
-（また、Windows の場合、GPU やプリエンプティブル VM、Workload Identity が利用できないことにご注意ください）
-Windows のバージョンマッピング（コンテナとして実行できるベースイメージと関係してきます）については以下をご参照ください。
+そこに Windows ノードプールを追加します。  
+（また、Windows の場合、GPU やプリエンプティブル VM、Workload Identity が利用できないことにご注意ください）  
+Windows のバージョンマッピング（コンテナとして実行できるベースイメージと関係してきます）については以下をご参照ください。  
 https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-cluster-windows?hl=ja#version_mapping
 
 ```bash
@@ -94,7 +94,7 @@ kubectl describe job.batch.volcano.sh sample
 kubectl delete job.batch.volcano.sh sample
 ```
 
-## 3. 100 並列の分散処理実行
+## 3. 並列分散処理の実行
 
 ### 3.1. Cloud Storage (GCS) へのファイルアップロード
 
