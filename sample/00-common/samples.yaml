@@ -1,0 +1,40 @@
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: sample
+spec:
+  minAvailable: 2
+  schedulerName: volcano
+  policies:
+  - event: PodEvicted
+    action: RestartJob
+  plugins:
+    env: []
+  tasks:
+  - name: "envs"
+    replicas: 1
+    template:
+      spec:
+        nodeSelector:
+          kubernetes.io/os: windows
+        containers:
+        - name: envs
+          image: gcr.io/@your-project-id/sample-apps:envs
+        restartPolicy: OnFailure
+  - name: "index"
+    replicas: 5
+    policies:
+      - event: TaskCompleted
+        action: CompleteJob
+    template:
+      spec:
+        nodeSelector:
+          kubernetes.io/os: windows
+        containers:
+        - name: idx
+          image: gcr.io/@your-project-id/sample-apps:envs
+          env:
+          - name: ENV_KEY
+            value: "VK_TASK_INDEX"
+        priorityClassName: high-priority
+        restartPolicy: OnFailure
