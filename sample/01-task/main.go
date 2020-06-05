@@ -51,7 +51,7 @@ func getConfig() config {
 		log.Fatalln(err)
 	}
 	return config{
-		index:  idx + 1,
+		index:  idx%30 + 1,
 		bucket: os.Getenv("INPUT_BUCKET"),
 		input:  os.Getenv("INPUT_FILE"),
 		params: os.Getenv("PARAMETER_FILE"),

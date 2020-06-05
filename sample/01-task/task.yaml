@@ -3,17 +3,17 @@ kind: Job
 metadata:
   name: task01
 spec:
-  minAvailable: 3
+  minAvailable: 100
   schedulerName: volcano
   policies:
   - event: PodEvicted
     action: RestartJob
-  maxRetry: 5
+  maxRetry: 10
   plugins:
     env: []
   tasks:
   - name: "apps"
-    replicas: 3
+    replicas: 100
     policies:
     - event: TaskCompleted
       action: CompleteJob
