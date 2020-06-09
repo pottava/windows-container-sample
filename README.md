@@ -32,23 +32,13 @@ $machine_type = "n1-standard-2"
 gcloud container clusters create ${cluster_name} --zone ${compute_zone} --cluster-version ${cluster_ver} --machine-type ${machine_type} --enable-ip-alias --preemptible --enable-autoscaling --num-nodes 1 --min-nodes 1 --max-nodes 3 --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --node-labels "os=cos" --enable-stackdriver-kubernetes --no-enable-autoupgrade --maintenance-window-start "2000-01-01T09:00:00-04:00" --maintenance-window-end "2000-01-01T17:00:00-04:00" --maintenance-window-recurrence 'FREQ=WEEKLY;BYDAY=SA,SU' --scopes "service-control,service-management,compute-rw,storage-ro,cloud-platform,logging-write,monitoring-write" --no-enable-basic-auth --no-issue-client-certificate
 ```
 
-そこに Windows ノードプールを追加します。  
-（また、Windows の場合、GPU やプリエンプティブル VM、Workload Identity が利用できないことにご注意ください）  
-Windows のバージョンマッピング（コンテナとして実行できるベースイメージと関係してきます）については以下をご参照ください。  
-https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-cluster-windows?hl=ja#version_mapping
+### 1.3. Volcano のインストール
 
-```bash
-gcloud container node-pools create "${cluster_name}-win-ltsc" --cluster ${cluster_name} --machine-type ${machine_type} --image-type "WINDOWS_LTSC" --enable-autoscaling --num-nodes 1 --min-nodes 1 --max-nodes 100 --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --no-enable-autoupgrade --node-labels "os=win-ltsc" --metadata "disable-legacy-endpoints=true"
-```
-
-kubectl での操作ができるようクラウドから kubeconfig を取得し、ノードの状態を確認します。
+kubectl での操作ができるようクラウドから kubeconfig を取得します。
 
 ```bash
 gcloud container clusters get-credentials ${cluster_name}
-kubectl get nodes -o wide
 ```
-
-### 1.4. Volcano のインストール
 
 以下のコマンドで Volcano をインストールしてください。
 
@@ -58,10 +48,35 @@ kubectl apply -f "https://raw.githubusercontent.com/volcano-sh/volcano/${volcano
 kubectl -n volcano-system get all
 ```
 
-### 1.5. その他スケジュール上有用なリソースを配置
+### 1.4. Windows ノードプールの追加
+
+Windows ノードプールを追加します。  
+（また、Windows の場合、GPU やプリエンプティブル VM、Workload Identity が利用できないことにご注意ください）  
+Windows のバージョンマッピング（コンテナとして実行できるベースイメージと関係してきます）については以下をご参照ください。  
+https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-cluster-windows?hl=ja#version_mapping
+
+```bash
+gcloud container node-pools create "${cluster_name}-win-ltsc" --cluster ${cluster_name} --machine-type ${machine_type} --image-type "WINDOWS_LTSC" --enable-autoscaling --num-nodes 1 --min-nodes 1 --max-nodes 10 --enable-autorepair --max-surge-upgrade 1 --max-unavailable-upgrade 0 --no-enable-autoupgrade --node-labels "os=win-ltsc" --metadata "disable-legacy-endpoints=true"
+```
+
+### 1.5. その他スケジュール上有用な設定・リソースを配置
+
+Taint を調整します。
+
+```bash
+kubectl taint node --selector os=cos "os=cos:NoSchedule"
+```
+
+プライオリティを設定します。
 
 ```bash
 kubectl apply -f sample/00-common/priority.yaml
+```
+
+ノードの状態を確認します。
+
+```bash
+kubectl get nodes -o wide
 ```
 
 ## 2. クラスタのセットアップ
@@ -111,16 +126,16 @@ gsutil cp sample/01-task/parameters.csv gs://${samle_bucket_name}/${samle_user_i
 GCP へのアクセス権限をもつサービスアカウントと、そのアクセスキーを作ります。
 
 ```bash
-gcloud iam service-accounts create gcs-access
-gcloud projects add-iam-policy-binding ${project_id} --member "serviceAccount:gcs-access@${project_id}.iam.gserviceaccount.com" --role roles/storage.admin
-gcloud iam service-accounts keys create key.json --iam-account "gcs-access@${project_id}.iam.gserviceaccount.com"
+gcloud iam service-accounts create batch-sample
+gcloud projects add-iam-policy-binding ${project_id} --member "serviceAccount:batch-sample@${project_id}.iam.gserviceaccount.com" --role roles/storage.admin
+gcloud iam service-accounts keys create key.json --iam-account "batch-sample@${project_id}.iam.gserviceaccount.com"
 ```
 
 それを GKE 上の Secret に格納します。
 
 ```bash
-kubectl create secret generic gcs-access --from-file=key.json=key.json
-kubectl describe secrets gcs-access
+kubectl create secret generic batch-sample --from-file=key.json=key.json
+kubectl describe secrets batch-sample
 ```
 
 ### 3.3. アプリケーションの build, ship & deploy
@@ -133,11 +148,13 @@ sample/01-task/task.yaml を以下の値に置き換え、後続のコマンド�
 
 ```bash
 cd sample/01-task
-docker run --rm -it -v "<カレントディレクトリ>":C:\tmp -w C:\tmp golang:1.14.4-nanoserver-1809 cmd.exe
+docker run --rm -it -v "<カレントディレクトリ>":C:\go\src\github.com\pottava\windows-container-sample -w C:\go\src\github.com\pottava\windows-container-sample golang:1.14.4-nanoserver-1809 cmd.exe
+$ go mod vendor
 $ go build
 $ exit
 docker build -t "gcr.io/${project_id}/sample-apps:01" .
 docker push "gcr.io/${project_id}/sample-apps:01"
 kubectl apply -f sample/01-task/task.yaml
 kubectl describe job.batch.volcano.sh task01
+kubectl delete job.batch.volcano.sh task01
 ```

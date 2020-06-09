@@ -86,9 +86,8 @@ func getParams(ctx context.Context, cfg config, bucket *storage.BucketHandle) []
 	}
 	defer raw.Close()
 
-	reader := csv.NewReader(raw)
-
 	// タスクに割り振られた index 番目のパラメタを返す
+	reader := csv.NewReader(raw)
 	count := -1
 	for {
 		record, err := reader.Read()

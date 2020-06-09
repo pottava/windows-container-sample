@@ -5,6 +5,14 @@ metadata:
 spec:
   minAvailable: 2
   schedulerName: volcano
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: os
+            operator: In
+            values: ["win-ltsc"]
   policies:
   - event: PodEvicted
     action: RestartJob
@@ -15,8 +23,11 @@ spec:
     replicas: 1
     template:
       spec:
-        nodeSelector:
-          kubernetes.io/os: windows
+        tolerations:
+        - key: node.kubernetes.io/os
+          operator: Equal
+          value: windows
+          effect: NoSchedule
         containers:
         - name: envs
           image: gcr.io/@your-project-id/sample-apps:envs
@@ -28,8 +39,11 @@ spec:
         action: CompleteJob
     template:
       spec:
-        nodeSelector:
-          kubernetes.io/os: windows
+        tolerations:
+        - key: node.kubernetes.io/os
+          operator: Equal
+          value: windows
+          effect: NoSchedule
         containers:
         - name: idx
           image: gcr.io/@your-project-id/sample-apps:envs
