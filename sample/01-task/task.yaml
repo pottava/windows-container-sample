@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: task01
 spec:
-  minAvailable: 10
+  minAvailable: 3
   schedulerName: volcano
   affinity:
     nodeAffinity:
@@ -21,7 +21,7 @@ spec:
     env: []
   tasks:
   - name: "apps"
-    replicas: 250
+    replicas: 5
     policies:
     - event: TaskCompleted
       action: CompleteJob
@@ -47,8 +47,8 @@ spec:
           - name: PARAMETER_FILE
             value: "@your-user/parameters.csv"
           - name: GOOGLE_APPLICATION_CREDENTIALS
-            value: C:\tmp\key.json
+            value: C:\google\key.json
           volumeMounts:
           - name: google-cloud-key
-            mountPath: C:\tmp
+            mountPath: C:\google
         restartPolicy: OnFailure

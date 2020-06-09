@@ -114,7 +114,7 @@ kubectl delete job.batch.volcano.sh sample
 ### 3.1. Cloud Storage (GCS) へのファイルアップロード
 
 ```bash
-$samle_bucket_name = "sample-20200505"
+$samle_bucket_name = "sample-<今日の日時>"
 $samle_user_id = "user-0001"
 gsutil mb -c STANDARD -l ${compute_region} gs://${samle_bucket_name}/
 gsutil cp sample/01-task/input.csv gs://${samle_bucket_name}/${samle_user_id}/
@@ -155,6 +155,12 @@ $ exit
 docker build -t "gcr.io/${project_id}/sample-apps:01" .
 docker push "gcr.io/${project_id}/sample-apps:01"
 kubectl apply -f sample/01-task/task.yaml
+```
+
+### 3.3. 結果の確認とお掃除
+
+```bash
+open "https://console.cloud.google.com/kubernetes/workload"
 kubectl describe job.batch.volcano.sh task01
 kubectl delete job.batch.volcano.sh task01
 ```

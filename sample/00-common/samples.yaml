@@ -33,7 +33,7 @@ spec:
           image: gcr.io/@your-project-id/sample-apps:envs
         restartPolicy: OnFailure
   - name: "index"
-    replicas: 5
+    replicas: 3
     policies:
       - event: TaskCompleted
         action: CompleteJob
