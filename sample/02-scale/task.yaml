@@ -1,0 +1,54 @@
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: task02
+spec:
+  minAvailable: 10
+  schedulerName: volcano
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: os
+            operator: In
+            values: ["win-ltsc"]
+  policies:
+  - event: PodEvicted
+    action: RestartJob
+  maxRetry: 10
+  plugins:
+    env: []
+  tasks:
+  - name: "apps"
+    replicas: 25
+    policies:
+    - event: TaskCompleted
+      action: CompleteJob
+    template:
+      spec:
+        tolerations:
+        - key: node.kubernetes.io/os
+          operator: Equal
+          value: windows
+          effect: NoSchedule
+        volumes:
+        - name: google-cloud-key
+          secret:
+            secretName: batch-sample
+        containers:
+        - name: main
+          image: gcr.io/@your-project-id/sample-apps:01
+          env:
+          - name: INPUT_BUCKET
+            value: "@your-bucket"
+          - name: INPUT_FILE
+            value: "@your-user/input.csv"
+          - name: PARAMETER_FILE
+            value: "@your-user/parameters.csv"
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: C:\google\key.json
+          volumeMounts:
+          - name: google-cloud-key
+            mountPath: C:\google
+        restartPolicy: OnFailure

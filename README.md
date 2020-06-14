@@ -164,3 +164,37 @@ open "https://console.cloud.google.com/kubernetes/workload"
 kubectl describe job.batch.volcano.sh task01
 kubectl delete job.batch.volcano.sh task01
 ```
+
+## 4. サンプルのカスタマイズ
+
+sample/02-task/task.yaml の値を置き換えます。
+
+- @your-project-id > ${project_id}
+- @your-bucket > ${samle_bucket_name}
+- @your-user > ${samle_user_id}
+
+### 4.1. タスク定義の基本
+
+- `metadata.name`: ジョブ名として識別されます (ex. [user-id]-[project-id]-[start-date]-[seq], 0001-a-200615-01)
+- `spec.plugins.env`: 必須。コンテナ側に `VK_TASK_INDEX` という環境変数が渡り、何個目のタスクかを判定できます
+- `spec.affinity`: 計算クラスターの特定ノードで計算されるよう調整できます
+
+```bash
+kubectl apply -f sample/02-task/task.yaml
+kubectl describe job.batch.volcano.sh 0001-a-200615-01
+kubectl delete job.batch.volcano.sh 0001-a-200615-01
+```
+
+### 4.2. 並列数の調整、タスク投入
+
+- `spec.tasks[].replicas`: 並列処理したいタスク数 (ex. 10000)
+- `spec.minAvailable`: 処理開始並列数 (ex. 100 -> 100 並列流せるリソースがあれば処理開始、9900 は待機)
+- `spec.maxRetry`: タスク失敗時のリトライ数上限
+
+```bash
+kubectl apply -f sample/02-task/task.yaml
+```
+
+### 4.3. 自動スケール
+
+待機ジョブが増えてくるとクラスタのノードがスケールします。Windows ノードプールの `min/max-nodes` で事前に調整してください。
