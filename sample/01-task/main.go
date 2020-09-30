@@ -26,7 +26,8 @@ func main() {
 	// 実行時引数を取得
 	cfg := getConfig()
 	ctx := getContext()
-	bucket := getBucket(ctx, cfg)
+	client, bucket := getBucket(ctx, cfg)
+	defer client.Close()
 
 	// パラメタファイルの取得
 	params := getParams(ctx, cfg, bucket)
@@ -39,10 +40,11 @@ func main() {
 }
 
 type config struct {
-	index  int
-	bucket string
-	input  string
-	params string
+	index   int
+	bucket  string
+	input   string
+	params  string
+	timeout time.Duration
 }
 
 func getConfig() config {
@@ -51,7 +53,7 @@ func getConfig() config {
 		log.Fatalln(err)
 	}
 	return config{
-		index:  idx%30 + 1,
+		index:  idx%3 + 1,
 		bucket: os.Getenv("INPUT_BUCKET"),
 		input:  os.Getenv("INPUT_FILE"),
 		params: os.Getenv("PARAMETER_FILE"),
@@ -70,12 +72,12 @@ func getContext() context.Context {
 	return ctx
 }
 
-func getBucket(ctx context.Context, cfg config) *storage.BucketHandle {
+func getBucket(ctx context.Context, cfg config) (*storage.Client, *storage.BucketHandle) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	return client.Bucket(cfg.bucket)
+	return client, client.Bucket(cfg.bucket)
 }
 
 func getParams(ctx context.Context, cfg config, bucket *storage.BucketHandle) []string {

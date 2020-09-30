@@ -22,7 +22,7 @@ gcloud config set compute/zone ${compute_zone}
 
 ```bash
 $cluster_name = "batch"
-$cluster_ver = "1.16.8-gke.15"
+$cluster_ver = "1.16.13-gke.401"
 $machine_type = "n1-standard-2"
 ```
 
@@ -43,7 +43,7 @@ gcloud container clusters get-credentials ${cluster_name}
 以下のコマンドで Volcano をインストールしてください。
 
 ```bash
-$volcano_version = "v0.4.0"
+$volcano_version = "v1.0.1"
 kubectl apply -f "https://raw.githubusercontent.com/volcano-sh/volcano/${volcano_version}/installer/volcano-development.yaml"
 kubectl -n volcano-system get all
 ```
@@ -60,12 +60,6 @@ gcloud container node-pools create "${cluster_name}-win-ltsc" --cluster ${cluste
 ```
 
 ### 1.5. その他スケジュール上有用な設定・リソースを配置
-
-Taint を調整します。
-
-```bash
-kubectl taint node --selector os=cos "os=cos:NoSchedule"
-```
 
 プライオリティを設定します。
 
@@ -173,7 +167,7 @@ sample/02-task/task.yaml の値を置き換えます。
 - @your-bucket > ${samle_bucket_name}
 - @your-user > ${samle_user_id}
 
-### 4.1. タスク定義の基本
+### 4.1. ジョブ定義の基本
 
 - `metadata.name`: ジョブ名として識別されます (ex. [user-id]-[project-id]-[start-date]-[seq], 0001-a-200615-01)
 - `spec.plugins.env`: 必須。コンテナ側に `VK_TASK_INDEX` という環境変数が渡り、何個目のタスクかを判定できます
@@ -185,7 +179,7 @@ kubectl describe job.batch.volcano.sh 0001-a-200615-01
 kubectl delete job.batch.volcano.sh 0001-a-200615-01
 ```
 
-### 4.2. 並列数の調整、タスク投入
+### 4.2. 並列数の調整、ジョブ投入
 
 - `spec.tasks[].replicas`: 並列処理したいタスク数 (ex. 10000)
 - `spec.minAvailable`: 処理開始並列数 (ex. 100 -> 100 並列流せるリソースがあれば処理開始、9900 は待機)
